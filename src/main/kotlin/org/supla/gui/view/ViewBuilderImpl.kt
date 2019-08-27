@@ -14,6 +14,7 @@
 package org.supla.gui.view
 
 import com.jfoenix.controls.JFXProgressBar
+import javafx.beans.property.BooleanProperty
 import javafx.scene.Node
 import javafx.scene.control.Label
 import javafx.scene.layout.Priority
@@ -21,12 +22,14 @@ import javafx.scene.layout.StackPane
 import javafx.scene.layout.VBox
 import org.slf4j.LoggerFactory
 import org.supla.gui.i18n.InternationalizationService
+import org.supla.gui.uidevice.UiChannel
 import org.supla.gui.uidevice.UiDevice
+import java.util.stream.Collectors
+import java.util.stream.Stream
 import javax.inject.Inject
 
 internal class ViewBuilderImpl @Inject constructor(
         private val internationalizationService: InternationalizationService,
-        emptyDeviceViewBuilder: EmptyDeviceViewBuilder,
         gateDeviceViewBuilder: GateDeviceViewBuilder,
         lightDeviceViewBuilder: LightDeviceViewBuilder,
         temperatureAndHumidityDeviceViewBuilder: TemperatureAndHumidityDeviceViewBuilder,
@@ -34,7 +37,6 @@ internal class ViewBuilderImpl @Inject constructor(
         rollerShutterDeviceViewBuilder: RollerShutterDeviceViewBuilder) : ViewBuilder {
     private val logger = LoggerFactory.getLogger(ViewBuilderImpl::class.java)
     private val builders: List<DeviceViewBuilder> = listOf(
-            emptyDeviceViewBuilder,
             gateDeviceViewBuilder,
             lightDeviceViewBuilder,
             temperatureAndHumidityDeviceViewBuilder,
@@ -82,20 +84,40 @@ internal class ViewBuilderImpl @Inject constructor(
         header.children.addAll(spinner)
         node.children.addAll(header)
 
-        val body = builders.stream()
-                .map { it.build(device, node) }
-                .filter { it != null }
-                .findAny()
-                .orElseGet {
-                    logger.warn("This device was unknown: {}", device)
-                    buildUnknownLabel(node)
-                }!!
-        body.maxWidth(Double.MAX_VALUE)
-        VBox.setVgrow(body, Priority.ALWAYS)
+        val channelNodes = if (device.channels.isNotEmpty()) {
+            node.styleClass.addAll("color-device")
+            val channelNodes = builders.stream()
+                    .flatMap { buildChannel(it, device.channels, device.updating) }
+                    .collect(Collectors.toList())
+            if (channelNodes.isEmpty()) {
+                logger.warn("This device was unknown: {}", device)
+                buildUnknownLabel(node)
+            }
+            channelNodes.forEach {
+                it.maxWidth(Double.MAX_VALUE)
+                VBox.setVgrow(it, Priority.ALWAYS)
+            }
+            channelNodes
+        } else {
+            val label = Label(internationalizationService.findMessage("jSuplaGui.tile.empty"))
+            label.isWrapText = true
+            label.styleClass.addAll("value")
+            node.styleClass.addAll("unknown")
+            listOf(StackPane(label))
+        }
+
+        val body = VBox(3.0)
         body.styleClass.addAll("body")
-        node.children.add(body)
+        body.children.addAll(channelNodes)
+        node.children.addAll(body)
         return node
     }
+
+    private fun buildChannel(deviceViewBuilder: DeviceViewBuilder, channels: List<UiChannel>, updating: BooleanProperty): Stream<Node> =
+            channels.stream()
+                    .map { deviceViewBuilder.build(it, updating) }
+                    .filter { it != null }
+                    .map { it as Node }
 
     private fun buildUnknownLabel(node: Node): Node {
         val label = Label(internationalizationService.findMessage("jSuplaGui.tile.unknown"))

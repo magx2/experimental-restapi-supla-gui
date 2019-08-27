@@ -21,6 +21,7 @@ class UiChannel(val nativeChannel: Channel) : Comparable<UiChannel> {
     val id = nativeChannel.id
     val caption = SimpleStringProperty(nativeChannel.caption)
     val connected = SimpleBooleanProperty(nativeChannel.isConnected)
+    val input = SimpleBooleanProperty(nativeChannel.isInput)
     val state: UiState = if (nativeChannel.findState().isPresent) {
         buildUiState(nativeChannel.findState().get())
     } else {

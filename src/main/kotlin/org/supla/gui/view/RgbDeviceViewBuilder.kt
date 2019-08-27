@@ -25,37 +25,28 @@ import javafx.scene.layout.Priority
 import javafx.scene.layout.VBox
 import javafx.scene.paint.Color
 import org.supla.gui.i18n.InternationalizationService
-import org.supla.gui.uidevice.*
+import org.supla.gui.uidevice.UiChannel
+import org.supla.gui.uidevice.UiColorAndBrightnessState
+import org.supla.gui.uidevice.UiColorState
+import org.supla.gui.uidevice.UiDimmerState
 import javax.inject.Inject
 
 class RgbDeviceViewBuilder @Inject constructor(private val internationalizationService: InternationalizationService) : DeviceViewBuilder {
-    override fun build(device: UiDevice, tile: Node): Node? {
-        if (isRgbDevice(device).not()) {
-            return null
-        }
-
-        tile.styleClass.addAll("color-device")
-
-        @Suppress("ThrowableNotThrown")
-        val rgbChannel = device.channels.stream()
-                .filter { isRgbChannel(it.state) }
-                .findAny()
-                .orElseThrow { IllegalStateException("Should not happen!") }
-
-        val node = VBox(3.0)
-
-        val updating = device.updating
-        when {
-            rgbChannel.state is UiColorState -> hsvSliders(rgbChannel.state.hue, rgbChannel.state.saturation, rgbChannel.state.value, rgbChannel.state.rgb, updating, node)
-            rgbChannel.state is UiDimmerState -> dimmerSlider(rgbChannel.state.brightness, updating, node)
-            rgbChannel.state is UiColorAndBrightnessState -> {
-                hsvSliders(rgbChannel.state.hue, rgbChannel.state.saturation, rgbChannel.state.value, rgbChannel.state.rgb, updating, node)
-                dimmerSlider(rgbChannel.state.brightness, updating, node)
+    override fun build(channel: UiChannel, updating: BooleanProperty): Node? =
+            if (channel.state is UiColorState || channel.state is UiColorAndBrightnessState || channel.state is UiDimmerState) {
+                val node = VBox(3.0)
+                when {
+                    channel.state is UiColorState -> hsvSliders(channel.state.hue, channel.state.saturation, channel.state.value, channel.state.rgb, updating, node)
+                    channel.state is UiDimmerState -> dimmerSlider(channel.state.brightness, updating, node)
+                    channel.state is UiColorAndBrightnessState -> {
+                        hsvSliders(channel.state.hue, channel.state.saturation, channel.state.value, channel.state.rgb, updating, node)
+                        dimmerSlider(channel.state.brightness, updating, node)
+                    }
+                }
+                node
+            } else {
+                null
             }
-        }
-
-        return node
-    }
 
     private fun dimmerSlider(brightness: DoubleProperty, updating: BooleanProperty, node: VBox) {
         val dimmer = JFXSlider()
@@ -100,13 +91,4 @@ class RgbDeviceViewBuilder @Inject constructor(private val internationalizationS
                 valueSlider
         )
     }
-
-    private fun isRgbDevice(device: UiDevice) =
-            device.channels
-                    .stream()
-                    .map { it.state }
-                    .anyMatch { isRgbChannel(it) }
-
-    private fun isRgbChannel(state: UiState) =
-            state is UiColorState || state is UiColorAndBrightnessState || state is UiDimmerState
 }

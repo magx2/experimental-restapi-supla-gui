@@ -16,10 +16,10 @@ package org.supla.gui.view
 import javafx.beans.property.BooleanProperty
 import javafx.scene.Node
 import javafx.scene.control.Label
-import org.supla.gui.uidevice.UiDevice
+import org.supla.gui.uidevice.UiChannel
 
 interface DeviceViewBuilder {
-    fun build(device: UiDevice, tile: Node): Node?
+    fun build(channel: UiChannel, updating: BooleanProperty): Node?
 }
 
 private const val dirtyLabel = "dirty"

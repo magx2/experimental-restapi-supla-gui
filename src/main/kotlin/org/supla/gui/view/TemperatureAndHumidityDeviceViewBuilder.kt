@@ -23,7 +23,10 @@ import javafx.scene.layout.HBox
 import javafx.scene.layout.Pane
 import javafx.scene.layout.VBox
 import org.supla.gui.i18n.InternationalizationService
-import org.supla.gui.uidevice.*
+import org.supla.gui.uidevice.UiChannel
+import org.supla.gui.uidevice.UiHumidityState
+import org.supla.gui.uidevice.UiTemperatureAndHumidityState
+import org.supla.gui.uidevice.UiTemperatureState
 import pl.grzeslowski.jsupla.api.channel.state.Percentage
 import java.math.BigDecimal
 import java.math.BigDecimal.ROUND_CEILING
@@ -31,50 +34,33 @@ import java.util.concurrent.Callable
 import javax.inject.Inject
 
 class TemperatureAndHumidityDeviceViewBuilder @Inject constructor(private val internationalizationService: InternationalizationService) : DeviceViewBuilder {
-    override fun build(device: UiDevice, tile: Node): Node? {
-        if (isTempAndHumDevice(device).not()) {
-            return null
-        }
+    override fun build(channel: UiChannel, updating: BooleanProperty): Node? =
+            if (channel.state is UiTemperatureState || channel.state is UiHumidityState || channel.state is UiTemperatureAndHumidityState) {
+                @Suppress("ThrowableNotThrown")
+                val left = VBox(3.0)
+                val right = VBox(3.0)
 
-        tile.styleClass.addAll("temp-hum-device")
+                val state = channel.state
+                if (state is UiTemperatureState) {
+                    addTemperatureLabel(state.temperature, left, right, updating)
+                }
 
-        @Suppress("ThrowableNotThrown")
-        val channel = device.channels.stream()
-                .filter { isTempOrHumChannel(it.state) }
-                .findAny()
-                .orElseThrow { IllegalStateException("should not happen!") }
+                if (state is UiHumidityState) {
+                    addHumidityLabel(state.humidity, left, right, updating)
+                }
 
-        val left = VBox(3.0)
-        val right = VBox(3.0)
+                if (state is UiTemperatureAndHumidityState) {
+                    addTemperatureLabel(state.temperature, left, right, updating)
+                    addHumidityLabel(state.humidity, left, right, updating)
+                }
 
-        val state = channel.state
-        if (state is UiTemperatureState) {
-            addTemperatureLabel(state.temperature, left, right, device.updating)
-        }
-
-        if (state is UiHumidityState) {
-            addHumidityLabel(state.humidity, left, right, device.updating)
-        }
-
-        if (state is UiTemperatureAndHumidityState) {
-            addTemperatureLabel(state.temperature, left, right, device.updating)
-            addHumidityLabel(state.humidity, left, right, device.updating)
-        }
-
-        val node = HBox(6.0)
-        node.alignment = Pos.TOP_CENTER
-        node.children.addAll(left, right)
-        return node
-    }
-
-    private fun isTempAndHumDevice(device: UiDevice) =
-            device.channels
-                    .stream()
-                    .map { it.state }
-                    .anyMatch { isTempOrHumChannel(it) }
-
-    private fun isTempOrHumChannel(state: UiState) =
-            state is UiTemperatureState || state is UiHumidityState || state is UiTemperatureAndHumidityState
+                val node = HBox(6.0)
+                node.alignment = Pos.TOP_CENTER
+                node.children.addAll(left, right)
+                node
+            } else {
+                null
+            }
 
     private fun addRow(left: Pane, right: Pane, label: Label, value: Label) {
         label.styleClass.addAll("value")
